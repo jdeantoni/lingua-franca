@@ -237,6 +237,7 @@ abstract class GeneratorBase extends AbstractLinguaFrancaValidator {
      * the Reaction instance is created, add that instance to this set.
      */
     protected var Set<Reaction> unorderedReactions = null
+    
 
     /**
      * Indicates whether or not the current Lingua Franca program
@@ -607,7 +608,7 @@ abstract class GeneratorBase extends AbstractLinguaFrancaValidator {
         }
         unorderedReactions.add(reaction)
     }
-
+    
     /**
      * Given a representation of time that may possibly include units, return
      * a string that the target language can recognize as a value. In this base
@@ -1179,6 +1180,38 @@ abstract class GeneratorBase extends AbstractLinguaFrancaValidator {
         Delay delay
     ) {
         throw new UnsupportedOperationException("This target does not support direct connections between federates.")
+    }
+    
+    /**
+     * 
+     */
+    def String generateNetworkDependantReactionBody(
+        Port port,
+        Set<Value> STPList
+    ) {
+        throw new UnsupportedOperationException("This target does not support direct connections between federates.")        
+    }    
+    
+    /**
+     * 
+     */
+    def isFederatedAndDecentralized() {
+        if (isFederated &&
+            config.coordination === CoordinationType.DECENTRALIZED) {
+            return true
+        }
+        return false
+    }
+    
+    /**
+     * 
+     */
+    def isFederatedAndCentralized() {
+        if (isFederated &&
+            config.coordination === CoordinationType.CENTRALIZED) {
+            return true
+        }
+        return false
     }
 
     /**
@@ -2017,8 +2050,13 @@ abstract class GeneratorBase extends AbstractLinguaFrancaValidator {
                     val message = "FIXME: Parallel connections between federates are not supported yet."
                     reportError(connection, message)
                 }
-                var leftFederate = federateByReactor.get(connection.leftPorts.get(0).container.name)
-                var rightFederate = federateByReactor.get(connection.rightPorts.get(0).container.name)
+                
+                var leftReactor = connection.leftPorts.get(0).container;
+                var leftFederate = federateByReactor.get(leftReactor.name)
+                
+                var rightReactor = connection.rightPorts.get(0).container;
+                var rightFederate = federateByReactor.get(rightReactor.name)
+                
                 if (leftFederate !== rightFederate) {
                     // Connection spans federates.
                     // First, update the dependencies in the FederateInstances.
@@ -2041,6 +2079,15 @@ abstract class GeneratorBase extends AbstractLinguaFrancaValidator {
                         if (connection.delay !== null) {
                             sendsTo.add(connection.delay)
                         }
+                        /* Do not need a separate causality loop detection for federates
+                         * because distributed execution now can handle reaction-level 
+                         * dependencies.
+                         * FIXME: However, there might be a need for a dependency delay check
+                         * (for both the centralized and decentralized coordination) where if there
+                         * is a cycle between reactions (including connections with a delay), the sum
+                         * of all delays along that path should be larger than the sum of network delays.
+                         */
+                        /*
                         // Check for causality loops between federates.
                         // FIXME: This does not detect cycles involving more than one federate.
                         var reverseDependency = leftFederate.dependsOn.get(rightFederate)
@@ -2054,7 +2101,7 @@ abstract class GeneratorBase extends AbstractLinguaFrancaValidator {
                                 // This is a fatal error, so throw an exception.
                                 throw new Exception(message)
                             }
-                        }
+                        } */
                     }
 
                     // Next, replace the connection in the AST with an action
