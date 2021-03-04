@@ -60,7 +60,6 @@ import org.icyphy.linguaFranca.Reaction
 import org.icyphy.linguaFranca.Reactor
 import org.icyphy.linguaFranca.ReactorDecl
 import org.icyphy.linguaFranca.StateVar
-import org.icyphy.linguaFranca.Time
 import org.icyphy.linguaFranca.Timer
 import org.icyphy.linguaFranca.TriggerRef
 import org.icyphy.linguaFranca.TypedVariable
@@ -848,19 +847,19 @@ class CGenerator extends GeneratorBase {
                 // ***** Start initializing the federated execution. */
             ''')
             
-            if (isFederatedAndDecentralized) {
-                val reactorInstance = main.getChildReactorInstance(federate.instantiation)
-                for (param : reactorInstance.parameters) {
-                    if (param.name.equalsIgnoreCase("STP") && param.type.isTime) {
-                        val stp = param.init.get(0).getTimeValue
-                        if (stp !== null) {                        
-                            pr('''
-                                set_stp_offset(«stp.timeInTargetLanguage»);
-                            ''')
-                        }
-                    }
-                }
-            }
+//            if (isFederatedAndDecentralized) {
+//                val reactorInstance = main.getChildReactorInstance(federate.instantiation)
+//                for (param : reactorInstance.parameters) {
+//                    if (param.name.equalsIgnoreCase("STP") && param.type.isTime) {
+//                        val stp = param.init.get(0).getTimeValue
+//                        if (stp !== null) {                        
+//                            pr('''
+//                                set_stp_offset(«stp.timeInTargetLanguage»);
+//                            ''')
+//                        }
+//                    }
+//                }
+//            }
             
             // Set indicator variables that specify whether the federate has
             // upstream logical connections.
@@ -3483,13 +3482,15 @@ class CGenerator extends GeneratorBase {
             }
             
             // Initialize the network_input_port_trigger for the input, if any exists
-            if (federate.networkInputPorts?.contains(input)) {
-                pr(initializeTriggerObjectsEnd, '''
-                    // Add trigger «nameOfSelfStruct»->___«input.name» to the global list of network input
-                    // ports 
-                    _fed.network_input_port_triggers[«federate.networkInputPorts.toList.indexOf(input)»]= 
-                                                                                &«nameOfSelfStruct»->___«input.name»;
-                ''')
+            if (federate.networkInputPorts !== null) {
+                if (federate.networkInputPorts.contains(input)) {
+                    pr(initializeTriggerObjectsEnd, '''
+                        // Add trigger «nameOfSelfStruct»->___«input.name» to the global list of network input
+                        // ports 
+                        _fed.network_input_port_triggers[«federate.networkInputPorts.toList.indexOf(input)»]= 
+                                                                                    &«nameOfSelfStruct»->___«input.name»;
+                    ''')
+                }
             }
         }
 
