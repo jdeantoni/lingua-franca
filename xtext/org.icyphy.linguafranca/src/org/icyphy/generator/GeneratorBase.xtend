@@ -53,6 +53,7 @@ import org.eclipse.xtext.generator.IGeneratorContext
 import org.eclipse.xtext.nodemodel.util.NodeModelUtils
 import org.eclipse.xtext.resource.XtextResource
 import org.eclipse.xtext.validation.CheckMode
+import org.icyphy.ASTUtils
 import org.icyphy.Configuration
 import org.icyphy.InferredType
 import org.icyphy.Target
@@ -2053,74 +2054,90 @@ abstract class GeneratorBase extends AbstractLinguaFrancaValidator {
             // for logical connections.
             var connectionsToRemove = new LinkedList<Connection>()
             for (connection : mainDefn.connections) {
-                // FIXME: Connections between federates do not support parallel connections.
-                if (connection.leftPorts.length !== 1 || connection.rightPorts.length !== 1) {
-                    val message = "FIXME: Parallel connections between federates are not supported yet."
-                    reportError(connection, message)
-                }
-                
-                var leftReactor = connection.leftPorts.get(0).container;
-                var leftFederate = federateByReactor.get(leftReactor.name)
-                
-                var rightReactor = connection.rightPorts.get(0).container;
-                var rightFederate = federateByReactor.get(rightReactor.name)
-                
-                if (leftFederate !== rightFederate) {
-                    // Connection spans federates.
-                    // First, update the dependencies in the FederateInstances.
-                    // Exclude physical connections because these do not create real dependencies.
-                    if (leftFederate !== rightFederate && !connection.physical && (config.coordination !==
-                        CoordinationType.DECENTRALIZED)) {
-                        var dependsOn = rightFederate.dependsOn.get(leftFederate)
-                        if (dependsOn === null) {
-                            dependsOn = new LinkedHashSet<Delay>()
-                            rightFederate.dependsOn.put(leftFederate, dependsOn)
-                        }
-                        if (connection.delay !== null) {
-                            dependsOn.add(connection.delay)
-                        }
-                        var sendsTo = leftFederate.sendsTo.get(rightFederate)
-                        if (sendsTo === null) {
-                            sendsTo = new LinkedHashSet<Delay>()
-                            leftFederate.sendsTo.put(rightFederate, sendsTo)
-                        }
-                        if (connection.delay !== null) {
-                            sendsTo.add(connection.delay)
-                        }
-                        /* Do not need a separate causality loop detection for federates
-                         * because distributed execution now can handle reaction-level 
-                         * dependencies.
-                         * FIXME: However, there might be a need for a dependency delay check
-                         * (for both the centralized and decentralized coordination) where if there
-                         * is a cycle between reactions (including connections with a delay), the sum
-                         * of all delays along that path should be larger than the sum of network delays.
-                         */
-                        /*
-                        // Check for causality loops between federates.
-                        // FIXME: This does not detect cycles involving more than one federate.
-                        var reverseDependency = leftFederate.dependsOn.get(rightFederate)
-                        if (reverseDependency !== null) {
-                            // Check that at least one direction has a delay.
-                            if (reverseDependency.size === 0 && dependsOn.size === 0) {
-                                // Found a causality loop.
-                                val message = "Causality loop found between federates " + leftFederate.name + " and " +
-                                    rightFederate.name
-                                reportError(connection, message)
-                                // This is a fatal error, so throw an exception.
-                                throw new Exception(message)
+                // To support multiport connections, iterate over the left terms of the
+                // connection and track the corresponding ones on the right.
+                // The validator should have checked that the total widths match.
+                var leftTerm = 0;
+                var rightTerm = 0;
+                var leftConnectionsAccountedFor = 0;
+                var rightConnectionsAccountedFor = 0;
+                while (leftConnectionsAccountedFor >= 0 && rightConnectionsAccountedFor >= 0) {
+                    var leftPort = connection.leftPorts.get(leftTerm);
+                    var rightPort = connection.rightPorts.get(rightTerm);
+                    var leftFederate = federateByReactor.get(leftPort.container.name);
+                    var rightFederate = federateByReactor.get(rightPort.container.name);
+                    if (leftFederate !== rightFederate || connectionsToRemove.contains(connection)) {
+                        // At least one part of the connection spans federates.
+                        // Assume they all do (it may be OK if they don't, assuming a federate
+                        // can send messages to itself).
+                        
+                        // First, update the dependencies in the FederateInstances.
+                        // Exclude physical connections because these do not create real dependencies.
+                        if (leftFederate !== rightFederate 
+                                && !connection.physical 
+                                && (config.coordination !== CoordinationType.DECENTRALIZED)) {
+                            var dependsOn = rightFederate.dependsOn.get(leftFederate)
+                            if (dependsOn === null) {
+                                dependsOn = new LinkedHashSet<Delay>()
+                                rightFederate.dependsOn.put(leftFederate, dependsOn)
                             }
-                        } */
+                            if (connection.delay !== null) {
+                                dependsOn.add(connection.delay)
+                            }
+                            var sendsTo = leftFederate.sendsTo.get(rightFederate)
+                            if (sendsTo === null) {
+                                sendsTo = new LinkedHashSet<Delay>()
+                                leftFederate.sendsTo.put(rightFederate, sendsTo)
+                            }
+                            if (connection.delay !== null) {
+                                sendsTo.add(connection.delay)
+                            }
+                        }
+
+                        // Next, replace the connection in the AST with an action
+                        // (which inherits the delay) and two reactions.
+                        // The action will be physical if the connection physical and
+                        // otherwise will be logical.
+                        ASTUtils.makeCommunication(connection, leftFederate, rightFederate, this, config.coordination)
+
+                        // To avoid concurrent modification exception, collect a list
+                        // of connections to remove.
+                        connectionsToRemove.add(connection)
                     }
-
-                    // Next, replace the connection in the AST with an action
-                    // (which inherits the delay) and two reactions.
-                    // The action will be physical if the connection physical and
-                    // otherwise will be logical.
-                    connection.makeCommunication(leftFederate, rightFederate, this, config.coordination)
-
-                    // To avoid concurrent modification exception, collect a list
-                    // of connections to remove.
-                    connectionsToRemove.add(connection)
+                    var leftWidth = ASTUtils.portWidth(leftPort, connection);
+                    var rightWidth = ASTUtils.portWidth(rightPort, connection);
+                    if (leftWidth < 0 || rightWidth < 0) {
+                        val message = "Cannot determine width of connectino from " + leftFederate.name + " to " +
+                                rightFederate.name
+                        reportError(connection, message)
+                        // This is a fatal error, so throw an exception.
+                        throw new Exception(message)
+                    }
+                    var minWidth = leftWidth;
+                    if (rightWidth < leftWidth) minWidth = rightWidth;
+                    
+                    leftConnectionsAccountedFor += minWidth;                    
+                    if (leftConnectionsAccountedFor >= leftWidth) {
+                        // Ran out of connections on the left. Get more from the connection.
+                        leftTerm++;
+                        if (leftTerm < connection.leftPorts.size) {
+                            leftConnectionsAccountedFor = 0;
+                        } else {
+                            // Indicate that we are done. No more channels.
+                            leftConnectionsAccountedFor = -1;
+                        }
+                    }
+                    rightConnectionsAccountedFor += minWidth;
+                    if (rightConnectionsAccountedFor >= rightWidth) {
+                        // Ran out of connections on the right. Get more from the connection.
+                        rightTerm++;
+                        if (rightTerm < connection.rightPorts.size) {
+                            rightConnectionsAccountedFor = 0;
+                        } else {
+                            // Indicate that we are done. No more channels.
+                            leftConnectionsAccountedFor = -1;
+                        }
+                    }
                 }
             }
             for (connection : connectionsToRemove) {
