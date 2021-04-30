@@ -18,6 +18,7 @@ def main(cfg):
     target = cfg["target"]
     benchmark_name = benchmark["name"]
     target_name = target["name"]
+    continue_on_error = cfg["continue_on_error"]
 
     # initialize the thread number if not specified
     if cfg["threads"] is None:
@@ -59,16 +60,20 @@ def main(cfg):
     log.info(f"Running {benchmark_name} using the {target_name} target.")
 
     # perform some sanity checks
-    check_benchmark_target_config(benchmark, target_name)
+    if not check_benchmark_target_config(benchmark, target_name):
+        if continue_on_error:
+            return
+        else:
+            raise RuntimeError("Aborting because an error occurred")
 
     # prepare the benchmark
-    for step in ["copy", "gen", "compile"]:
+    for step in ["prepare", "copy", "gen", "compile"]:
         if target[step] is not None:
-            execute_command(target[step])
+            execute_command(target[step], continue_on_error)
 
     # run the benchmark
     if target["run"] is not None:
-        output = execute_command(target["run"])
+        output = execute_command(target["run"], continue_on_error)
         times = hydra.utils.call(target["parser"], output)
         write_results(times, cfg)
     else:
@@ -78,9 +83,8 @@ def main(cfg):
 def check_benchmark_target_config(benchmark, target_name):
     benchmark_name = benchmark["name"]
     if target_name not in benchmark["targets"]:
-        raise RuntimeError(
-            f"target {target_name} is not supported by the benchmark {benchmark_name}"
-        )
+        log.error(f"target {target_name} is not supported by the benchmark {benchmark_name}")
+        return False
     # keep a list of all benchmark parameters
     bench_params = list(benchmark["params"].keys())
 
@@ -91,15 +95,18 @@ def check_benchmark_target_config(benchmark, target_name):
         if arg_type in target_cfg and target_cfg[arg_type] is not None:
             for param in target_cfg[arg_type].keys():
                 if param not in bench_params:
-                    raise RuntimeError(f"{param} is not a parameter of the benchmark!")
+                    log.error(f"{param} is not a parameter of the benchmark!")
+                    return False
                 used_params.add(param)
 
     for param in bench_params:
         if param not in used_params:
             log.warning(f"The benchmark parameter {param} is not used in any command")
 
+    return True
 
-def execute_command(command):
+
+def execute_command(command, continue_on_error):
     # the command can be a list of lists due to the way we use an omegaconf
     # resolver to determine the arguments. We need to flatten the command list
     # first. We also need to touch each element individually to make sure that
@@ -128,10 +135,16 @@ def execute_command(command):
                 output.append(nextline)
                 cmd_log.info(nextline.rstrip())
 
-        if process.returncode != 0:
-            raise RuntimeError(
-                f"Command returned with non-zero exit code ({process.returncode})"
-            )
+        code = process.returncode
+        if code != 0:
+            if continue_on_error:
+                log.error(
+                    f"Command returned with non-zero exit code ({code})"
+                )
+            else:
+                raise RuntimeError(
+                    f"Command returned with non-zero exit code ({code})"
+                )
 
     return output
 
@@ -140,13 +153,14 @@ def write_results(times, cfg):
     row = {
         "benchmark": cfg["benchmark"]["name"],
         "target": cfg["target"]["name"],
-        "total iterations": cfg["iterations"],
+        "total_iterations": cfg["iterations"],
         "threads": cfg["threads"],
         "iteration": None,
-        "time (ms)": None,
+        "time_ms": None,
     }
     # also add all parameters and their values
     row.update(cfg["benchmark"]["params"])
+    row.update(cfg["target"]["params"])
 
     with open("results.csv", "w", newline="") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=row.keys())
@@ -154,7 +168,7 @@ def write_results(times, cfg):
         i = 0
         for t in times:
             row["iteration"] = i
-            row["time (ms)"] = t
+            row["time_ms"] = t
             writer.writerow(row)
             i += 1
 
