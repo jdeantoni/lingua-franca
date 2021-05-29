@@ -439,6 +439,9 @@ struct reaction_t {
                                        // intended. Currently, this is only possible if logical
                                        // connections are used in a decentralized federated
                                        // execution. COMMON.
+    trigger_t* triggered_by[INITIAL_REACT_QUEUE_SIZE]; // A list of triggers that are present
+                                                       // for the reaction
+    int triggered_by_index; // Index to the triggered_by array.
 };
 
 /** Typedef for event_t struct, used for storing activation records. */
@@ -555,7 +558,7 @@ void __pop_events();
  * @param token The token payload.
  * @return A handle to the event, or 0 if no event was scheduled, or -1 for error.
  */
-handle_t __schedule(trigger_t* trigger, interval_t delay, lf_token_t* token);
+handle_t __schedule(trigger_t* trigger, interval_t delay, lf_token_t* token, reaction_t* reaction);
 
 /**
  * Function (to be code generated) to schedule timers.

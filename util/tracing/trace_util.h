@@ -111,6 +111,14 @@ char* get_object_description(void* reactor, int* index);
 char* get_trigger_name(void* trigger, int* index);
 
 /**
+ * Get a string formatted list from an array of triggers.
+ * 
+ * @param triggers Must be an array of trigger_t* with a fixed size
+ *  of TRACE_TRIGGER_LISTS_SIZE
+ */
+char* get_triggers_name_list(void* triggers[TRACE_TRIGGER_LISTS_SIZE]);
+
+/**
  * Print the object to description table.
  */
 void print_table();

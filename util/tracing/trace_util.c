@@ -199,6 +199,34 @@ char* get_trigger_name(void* trigger, int* index) {
 }
 
 /**
+ * Get a string formatted list from an array of triggers.
+ * 
+ * @param triggers Must be an array of trigger_t* with a fixed size
+ *  of TRACE_TRIGGER_LISTS_SIZE
+ */
+char* get_triggers_name_list(void* triggers[TRACE_TRIGGER_LISTS_SIZE]) {
+    char* list_string = malloc(TRACE_TRIGGER_LISTS_SIZE * BUFFER_SIZE * sizeof(char));
+    for (int i = 0; i < TRACE_TRIGGER_LISTS_SIZE - 1; i++) {
+        if (triggers[i] != NULL) {
+            char* trigger_name = get_trigger_name(triggers[i], NULL);
+            if (trigger_name != NULL) {
+                sprintf(list_string, "%s:", trigger_name);
+            }
+        }
+    }
+
+    if (triggers[TRACE_TRIGGER_LISTS_SIZE - 1] != NULL) {
+        char* trigger_name = get_trigger_name(triggers[TRACE_TRIGGER_LISTS_SIZE - 1], NULL);
+        if (trigger_name != NULL) {
+            // sprintf() automatically appends a null
+            sprintf(list_string, "%s", trigger_name);
+        }
+    }
+    // sprintf(list_string, " ");
+    return list_string;
+}
+
+/**
  * Print the object to description table.
  */
 void print_table() {

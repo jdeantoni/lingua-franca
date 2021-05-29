@@ -2178,6 +2178,7 @@ class CGenerator extends GeneratorBase {
                     self->___reaction_«reactionCount».self = self;
                     self->___reaction_«reactionCount».deadline_violation_handler = «deadlineFunctionPointer»;
                     self->___reaction_«reactionCount».tardy_handler = «tardyFunctionPointer»;
+                    self->___reaction_«reactionCount».triggered_by_index = 0;
                 ''')
 
             }
@@ -3396,6 +3397,11 @@ class CGenerator extends GeneratorBase {
                 pr(builder, '''
                     _lf_register_trace_event(«nameOfSelfStruct», &(«nameOfSelfStruct»->___«action.name»), trace_trigger, "«description».«action.name»");
                 ''')
+            }
+            for (input : instance.inputs) {
+                pr(builder, '''
+                    _lf_register_trace_event(«nameOfSelfStruct», &(«nameOfSelfStruct»->___«input.name»), trace_trigger, "«description».«input.name»");
+                ''')            	
             }
             for (timer : instance.timers) {
                 pr(builder, '''

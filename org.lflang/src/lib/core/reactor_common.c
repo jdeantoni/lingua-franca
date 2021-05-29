@@ -562,6 +562,9 @@ void __pop_events() {
         for (int i = 0; i < event->trigger->number_of_reactions; i++) {
             DEBUG_PRINT("Pushed onto reaction_q: %p", event->trigger->reactions[i]);
             reaction_t *reaction = event->trigger->reactions[i];
+            if (reaction->triggered_by_index < TRACE_TRIGGER_LISTS_SIZE - 1) {
+                reaction->triggered_by[reaction->triggered_by_index++] = event->trigger;
+            }
             // Do not enqueue this reaction twice.
             if (pqueue_find_equal_same_priority(reaction_q, reaction) == NULL) {
 #ifdef FEDERATED_DECENTRALIZED
@@ -598,7 +601,7 @@ void __pop_events() {
             // function will add the trigger->offset, which we don't want at this point.
             // NULL argument indicates that there is no value.
             __schedule(event->trigger,
-                    event->trigger->period - event->trigger->offset, NULL);
+                    event->trigger->period - event->trigger->offset, NULL, NULL);
         }
 
         // Copy the token pointer into the trigger struct so that the
@@ -652,7 +655,7 @@ void _lf_initialize_timer(trigger_t* timer) {
     if (timer->offset == 0) {
         for (int i = 0; i < timer->number_of_reactions; i++) {
             _lf_enqueue_reaction(timer->reactions[i]);
-            tracepoint_schedule(timer, 0LL); // Trace even though schedule is not called.
+            tracepoint_schedule(timer, 0LL, NULL); // Trace even though schedule is not called.
         }
         if (timer->period == 0) {
             return;
@@ -672,7 +675,7 @@ void _lf_initialize_timer(trigger_t* timer) {
     e->time = get_logical_time() + delay;
     // NOTE: No lock is being held. Assuming this only happens at startup.
     pqueue_insert(event_q, e);
-    tracepoint_schedule(timer, delay); // Trace even though schedule is not called.
+    tracepoint_schedule(timer, delay, NULL); // Trace even though schedule is not called.
 }
 
 /**
@@ -803,7 +806,7 @@ int _lf_schedule_at_tag(trigger_t* trigger, tag_t tag, lf_token_t* token) {
     // Set the event time
     e->time = tag.time;
     
-    tracepoint_schedule(trigger, tag.time - current_logical_tag.time);
+    tracepoint_schedule(trigger, tag.time - current_logical_tag.time, NULL);
 
     // Make sure the event points to this trigger so when it is
     // dequeued, it will trigger this trigger.
@@ -976,9 +979,10 @@ int _lf_schedule_at_tag(trigger_t* trigger, tag_t tag, lf_token_t* token) {
  *  trigger's minimum delay, if it has one. If this number is negative,
  *  then zero is used instead.
  * @param token The token wrapping the payload or NULL for no payload.
+ * @param reaction The reaction that invoked a schedule function
  * @return A handle to the event, or 0 if no new event was scheduled, or -1 for error.
  */
-handle_t __schedule(trigger_t* trigger, interval_t extra_delay, lf_token_t* token) {
+handle_t __schedule(trigger_t* trigger, interval_t extra_delay, lf_token_t* token, reaction_t* reaction) {
     if (_lf_is_tag_after_stop_tag(current_tag)) {
         // If schedule is called after stop_tag
         // This is a critical condition.
@@ -1196,7 +1200,7 @@ handle_t __schedule(trigger_t* trigger, interval_t extra_delay, lf_token_t* toke
             e->time - start_time);
     pqueue_insert(event_q, e);
 
-    tracepoint_schedule(trigger, e->time - current_tag.time);
+    tracepoint_schedule(trigger, e->time - current_tag.time, reaction);
 
     // FIXME: make a record of handle and implement unschedule.
     // NOTE: Rather than wrapping around to get a negative number,
@@ -1551,9 +1555,9 @@ void schedule_output_reactions(reaction_t* reaction, int worker) {
         }
         if (!violation) {
             // Invoke the downstream_reaction function.
-            tracepoint_reaction_starts(downstream_to_execute_now, worker);
+            tracepoint_reaction_starts(downstream_to_execute_now, worker, get_present_triggers_list(downstream_to_execute_now));
             downstream_to_execute_now->function(downstream_to_execute_now->self);
-            tracepoint_reaction_ends(downstream_to_execute_now, worker);
+            tracepoint_reaction_ends(downstream_to_execute_now, worker, get_triggered_effects_list(downstream_to_execute_now));
 
             // If the downstream_reaction produced outputs, put the resulting triggered
             // reactions into the queue (or execute them directly, if possible).

@@ -68,8 +68,8 @@ class LFGenerator extends AbstractGenerator {
             }
         }
         
-        generator.doGenerate(resource, fsa, context)
-        generatorErrorsOccurred = generator.errorsOccurred()
+        generator?.doGenerate(resource, fsa, context)
+        generatorErrorsOccurred = generator?.errorsOccurred()
     }
 
     /**

@@ -8,6 +8,8 @@
  */
 target C {
     timeout: 50 msec,
+    tracing: true,
+    flags: ["-g"]
 }
 reactor Source {
     output out1:int;
