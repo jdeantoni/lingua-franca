@@ -82,6 +82,55 @@ public enum Target {
                 "_Thread_local" // (since C11)
                 )
     ), 
+    Simulation("Simulation", true, Arrays.asList(
+            // List via: https://en.cppreference.com/w/c/keyword
+            "auto",
+            "break",
+            "case",
+            "char",
+            "const",
+            "continue",
+            "default",
+            "do",
+            "double",
+            "else",
+            "enum",
+            "extern",
+            "float",
+            "for",
+            "goto",
+            "if",
+            "inline", // (since C99)
+            "int",
+            "Integer",
+            "long",
+            "register",
+            "restrict", // (since C99)
+            "return",
+            "short",
+            "signed",
+            "sizeof",
+            "static",
+            "struct",
+            "switch",
+            "typedef",
+            "union",
+            "unsigned",
+            "void",
+            "volatile",
+            "while",
+            "_Alignas", // (since C11)
+            "_Alignof", // (since C11)
+            "_Atomic", // (since C11)
+            "_Bool", // (since C99)
+            "_Complex", // (since C99)
+            "_Generic", // (since C11)
+            "_Imaginary", // (since C99)
+            "_Noreturn", // (since C11)
+            "_Static_assert", // (since C11)
+            "_Thread_local" // (since C11)
+            )
+    ),     
     CCPP("CCpp", true, Target.C.keywords), 
     CPP("Cpp", true, Arrays.asList(
                 // List via: https://en.cppreference.com/w/cpp/keyword
