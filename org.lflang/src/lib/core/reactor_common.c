@@ -562,9 +562,13 @@ void __pop_events() {
         for (int i = 0; i < event->trigger->number_of_reactions; i++) {
             DEBUG_PRINT("Pushed onto reaction_q: %p", event->trigger->reactions[i]);
             reaction_t *reaction = event->trigger->reactions[i];
+#ifdef LINGUA_FRANCA_TRACE
             if (reaction->triggered_by_index < TRACE_TRIGGER_LISTS_SIZE - 1) {
                 reaction->triggered_by[reaction->triggered_by_index++] = event->trigger;
+            } else {
+                warning_print("Truncating the triggered by column in traces");
             }
+#endif
             // Do not enqueue this reaction twice.
             if (pqueue_find_equal_same_priority(reaction_q, reaction) == NULL) {
 #ifdef FEDERATED_DECENTRALIZED
@@ -1451,6 +1455,13 @@ void schedule_output_reactions(reaction_t* reaction, int worker) {
                     DEBUG_PRINT("Trigger %p lists %d reactions.", trigger, trigger->number_of_reactions);
                     for (int k=0; k < trigger->number_of_reactions; k++) {
                         reaction_t* downstream_reaction = trigger->reactions[k];
+#ifdef LINGUA_FRANCA_TRACE
+                        if (downstream_reaction->triggered_by_index < TRACE_TRIGGER_LISTS_SIZE - 1) {
+                            downstream_reaction->triggered_by[downstream_reaction->triggered_by_index++] = trigger;
+                        } else {
+                            warning_print("Truncating the triggered by column in traces");
+                        }
+#endif
 #ifdef FEDERATED_DECENTRALIZED // Only pass down tardiness for federated LF programs
                         // Set the tardiness for the downstream reaction
                         if (downstream_reaction != NULL) {
