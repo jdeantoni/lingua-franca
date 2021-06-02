@@ -206,11 +206,14 @@ char* get_trigger_name(void* trigger, int* index) {
  */
 char* get_triggers_name_list(void* triggers[TRACE_TRIGGER_LISTS_SIZE]) {
     char* list_string = malloc(TRACE_TRIGGER_LISTS_SIZE * BUFFER_SIZE * sizeof(char));
+    char* working_string = list_string;
     for (int i = 0; i < TRACE_TRIGGER_LISTS_SIZE - 1; i++) {
         if (triggers[i] != NULL) {
+            // printf("Getting trigger name for %p.\n", triggers[i]);
             char* trigger_name = get_trigger_name(triggers[i], NULL);
+            // printf("Got name %s for trigger %p.\n", trigger_name, triggers[i]);
             if (trigger_name != NULL) {
-                sprintf(list_string, "%s:", trigger_name);
+                working_string += sprintf(working_string, "%s:", trigger_name);
             }
         }
     }
@@ -218,8 +221,8 @@ char* get_triggers_name_list(void* triggers[TRACE_TRIGGER_LISTS_SIZE]) {
     if (triggers[TRACE_TRIGGER_LISTS_SIZE - 1] != NULL) {
         char* trigger_name = get_trigger_name(triggers[TRACE_TRIGGER_LISTS_SIZE - 1], NULL);
         if (trigger_name != NULL) {
-            // sprintf() automatically appends a null
-            sprintf(list_string, "%s", trigger_name);
+            // sprintf() automatically appends a null at the end of the string
+            working_string += sprintf(working_string, "%s", trigger_name);
         }
     }
     // sprintf(list_string, " ");
