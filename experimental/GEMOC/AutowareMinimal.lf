@@ -30,7 +30,7 @@ reactor Camera {
         } else {
             SET(image, 2);
         }    
-        self->alternator != self->alternator;
+        self->alternator = !self->alternator;
     =}
 }
 
