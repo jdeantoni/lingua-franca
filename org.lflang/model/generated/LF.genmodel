@@ -184,7 +184,8 @@
     </genClasses>
     <genClasses ecoreClass="LF.ecore#//Variable">
       <genFeatures createChild="false" ecoreFeature="ecore:EAttribute LF.ecore#//Variable/name"/>
-      <genOperations ecoreOperation="LF.ecore#//Variable/updates"/>
+      <genOperations ecoreOperation="LF.ecore#//Variable/present"/>
+      <genOperations ecoreOperation="LF.ecore#//Variable/absent"/>
     </genClasses>
     <genClasses ecoreClass="LF.ecore#//Trigger"/>
     <genClasses ecoreClass="LF.ecore#//Effect"/>
