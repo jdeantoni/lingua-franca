@@ -82,7 +82,7 @@ int _lf_trace_object_descriptions_size = 0;
 /**
  * Register a trace event.
  * @param pointer1 Pointer that identifies the object, typically to a reactor self struct.
- * @param pointer2 Further identifying pointer, typically to a trigger (action or timer) or NULL if irrelevant.
+ * @param pointer2 Further identifying pointer, typically to a trigger (action or timer or port) or NULL if irrelevant.
  * @param type The type of trace object.
  * @param description The human-readable description of the object.
  * @return 1 if successful, 0 if the trace object table is full.
@@ -378,7 +378,9 @@ void tracepoint(
         int worker,
         instant_t* physical_time,
         trigger_t* trigger,
-        interval_t extra_delay
+        interval_t extra_delay,
+        trigger_t* triggered_by[TRACE_TRIGGER_LISTS_SIZE],
+        trigger_t* effects[TRACE_TRIGGER_LISTS_SIZE]
 ) {
     // printf("DEBUG: Creating trace record.\n");
     // Flush the buffer if it is full.
@@ -403,7 +405,14 @@ void tracepoint(
     }
     _lf_trace_buffer_size[index]++;
     _lf_trace_buffer[index][i].trigger = trigger;
-    _lf_trace_buffer[index][i].extra_delay = extra_delay;
+    for (int j = 0; j < TRACE_TRIGGER_LISTS_SIZE; j++) {
+        if (triggered_by != NULL) {
+            _lf_trace_buffer[index][i].triggered_by[j] = triggered_by[j];
+        }
+        if (effects != NULL) {
+            _lf_trace_buffer[index][i].effects[j] = effects[j];
+        }
+    }
 }
 
 /**
@@ -411,8 +420,8 @@ void tracepoint(
  * @param reaction Pointer to the reaction_t struct for the reaction.
  * @param worker The thread number of the worker thread or 0 for unthreaded execution.
  */
-void tracepoint_reaction_starts(reaction_t* reaction, int worker) {
-    tracepoint(reaction_starts, reaction->self, reaction->number, worker, NULL, NULL, 0);
+void tracepoint_reaction_starts(reaction_t* reaction, int worker, trigger_t* triggered_by[TRACE_TRIGGER_LISTS_SIZE]) {
+    tracepoint(reaction_starts, reaction->self, reaction->number, worker, NULL, NULL, 0, triggered_by, NULL);
 }
 
 /**
@@ -420,16 +429,18 @@ void tracepoint_reaction_starts(reaction_t* reaction, int worker) {
  * @param reaction Pointer to the reaction_t struct for the reaction.
  * @param worker The thread number of the worker thread or 0 for unthreaded execution.
  */
-void tracepoint_reaction_ends(reaction_t* reaction, int worker) {
-    tracepoint(reaction_ends, reaction->self, reaction->number, worker, NULL, NULL, 0);
+void tracepoint_reaction_ends(reaction_t* reaction, int worker, trigger_t* effects[TRACE_TRIGGER_LISTS_SIZE]) {
+    tracepoint(reaction_ends, reaction->self, reaction->number, worker, NULL, NULL, 0, NULL, effects);
 }
 
 /**
  * Trace a call to schedule.
  * @param trigger Pointer to the trigger_t struct for the trigger.
  * @param extra_delay The extra delay passed to schedule().
+ * @param reaction The reaction that is calling schedule. Note that a scheduling
+ *  event will only occur if a new event is actually inserted into the event queue.
  */
-void tracepoint_schedule(trigger_t* trigger, interval_t extra_delay) {
+void tracepoint_schedule(trigger_t* trigger, interval_t extra_delay, reaction_t* reaction) {
     // schedule() can only trigger reactions within the same reactor as the action
     // or timer. If there is such a reaction, find its reactor's self struct and
     // put that into the tracepoint. We only have to look at the first reaction.
@@ -439,7 +450,11 @@ void tracepoint_schedule(trigger_t* trigger, interval_t extra_delay) {
             && trigger->reactions[0] != NULL) {
         reactor = trigger->reactions[0]->self;
     }
-    tracepoint(schedule_called, reactor, 0, 0, NULL, trigger, extra_delay);
+    int reaction_number = 0;
+    if (reaction != NULL) {
+        reaction_number = reaction->number;        
+    }
+    tracepoint(schedule_called, reactor, reaction_number, 0, NULL, trigger, extra_delay, NULL, NULL);
 }
 
 /**
@@ -450,7 +465,7 @@ void tracepoint_schedule(trigger_t* trigger, interval_t extra_delay) {
  */
 void tracepoint_user_event(char* description) {
     // -1s indicate unknown reaction number and worker thread.
-    tracepoint(user_event, description,  -1, -1, NULL, NULL, 0);
+    tracepoint(user_event, description,  -1, -1, NULL, NULL, 0, NULL, NULL);
 }
 
 /**
@@ -465,7 +480,7 @@ void tracepoint_user_event(char* description) {
  */
 void tracepoint_user_value(char* description, long long value) {
     // -1s indicate unknown reaction number and worker thread.
-    tracepoint(user_value, description,  -1, -1, NULL, NULL, value);
+    tracepoint(user_value, description,  -1, -1, NULL, NULL, value, NULL, NULL);
 }
 
 /**
@@ -473,7 +488,7 @@ void tracepoint_user_value(char* description, long long value) {
  * @param worker The thread number of the worker thread or 0 for unthreaded execution.
  */
 void tracepoint_worker_wait_starts(int worker) {
-    tracepoint(worker_wait_starts, NULL, -1, worker, NULL, NULL, 0);
+    tracepoint(worker_wait_starts, NULL, -1, worker, NULL, NULL, 0, NULL, NULL);
 }
 
 /**
@@ -481,7 +496,7 @@ void tracepoint_worker_wait_starts(int worker) {
  * @param worker The thread number of the worker thread or 0 for unthreaded execution.
  */
 void tracepoint_worker_wait_ends(int worker) {
-    tracepoint(worker_wait_ends, NULL, -1, worker, NULL, NULL, 0);
+    tracepoint(worker_wait_ends, NULL, -1, worker, NULL, NULL, 0, NULL, NULL);
 }
 
 /**
@@ -490,7 +505,7 @@ void tracepoint_worker_wait_ends(int worker) {
  * @param worker The thread number of the worker thread or 0 for unthreaded execution.
  */
 void tracepoint_worker_advancing_time_starts(int worker) {
-    tracepoint(worker_advancing_time_starts, NULL, -1, worker, NULL, NULL, 0);
+    tracepoint(worker_advancing_time_starts, NULL, -1, worker, NULL, NULL, 0, NULL, NULL);
 }
 
 /**
@@ -499,7 +514,7 @@ void tracepoint_worker_advancing_time_starts(int worker) {
  * @param worker The thread number of the worker thread or 0 for unthreaded execution.
  */
 void tracepoint_worker_advancing_time_ends(int worker) {
-    tracepoint(worker_advancing_time_ends, NULL, -1, worker, NULL, NULL, 0);
+    tracepoint(worker_advancing_time_ends, NULL, -1, worker, NULL, NULL, 0, NULL, NULL);
 }
 
 /**
@@ -537,4 +552,36 @@ void stop_trace() {
     fclose(_lf_trace_file);
     _lf_trace_file = NULL;
     DEBUG_PRINT("Stopped tracing.");
+}
+
+/**
+ * Produce a list of pointers to triggered events by the 'reaction'
+ */
+trigger_t** get_triggered_effects_list(reaction_t* reaction) {
+    int array_index = 0;
+    trigger_t** effects_list = (trigger_t**)malloc(TRACE_TRIGGER_LISTS_SIZE * sizeof(trigger_t*));
+    for (int i=0; i < reaction->num_outputs; i++) {
+        if (*(reaction->output_produced[i])) {
+            trigger_t** triggerArray = (reaction->triggers)[i];
+            for (int j=0; j < reaction->triggered_sizes[i]; j++) {
+                array_index = i + j;
+                if (array_index >= TRACE_TRIGGER_LISTS_SIZE) {
+                    warning_print("Truncating the effects list in the trace.");
+                    return effects_list;
+                }
+                DEBUG_PRINT("Adding trigger %p to effects list[%d].", triggerArray[j], array_index);
+                effects_list[array_index] = triggerArray[j];
+            }
+        }
+    }
+    // Pad the rest
+    for (int i = array_index+1; i < TRACE_TRIGGER_LISTS_SIZE; i++) {
+        effects_list[i] = NULL;
+    }
+    return effects_list;
+}
+
+trigger_t** get_present_triggers_list(reaction_t* reaction) {
+    reaction->triggered_by_index = 0;
+    return reaction->triggered_by;
 }

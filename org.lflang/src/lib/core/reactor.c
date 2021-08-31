@@ -44,7 +44,7 @@ THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 handle_t _lf_schedule_token(void* action, interval_t extra_delay, lf_token_t* token) {
     trigger_t* trigger = _lf_action_to_trigger(action);
-    return __schedule(trigger, extra_delay, token);
+    return __schedule(trigger, extra_delay, token, NULL);
 }
 
 /**
@@ -179,9 +179,9 @@ int _lf_do_step() {
         
         if (!violation) {
             // Invoke the reaction function.
-            tracepoint_reaction_starts(reaction, 0); // 0 indicates unthreaded.
+            tracepoint_reaction_starts(reaction, 0, get_present_triggers_list(reaction)); // 0 indicates unthreaded.
             reaction->function(reaction->self);
-            tracepoint_reaction_ends(reaction, 0);
+            tracepoint_reaction_ends(reaction, 0, get_triggered_effects_list(reaction));
 
             // If the reaction produced outputs, put the resulting triggered
             // reactions into the queue.

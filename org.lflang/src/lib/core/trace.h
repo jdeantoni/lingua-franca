@@ -64,6 +64,9 @@ typedef enum {
     worker_advancing_time_ends
 } trace_event_t;
 
+/** Size of the triggered_by and effects list. */
+#define TRACE_TRIGGER_LISTS_SIZE 10
+
 #ifdef LINGUA_FRANCA_TRACE
 
 /**
@@ -97,6 +100,8 @@ typedef struct trace_record_t {
     instant_t physical_time;
     trigger_t* trigger;
     interval_t extra_delay;
+    trigger_t* triggered_by[TRACE_TRIGGER_LISTS_SIZE];
+    trigger_t* effects[TRACE_TRIGGER_LISTS_SIZE];
 } trace_record_t;
 
 /**
@@ -168,7 +173,9 @@ void tracepoint(
         int worker,
         instant_t* physical_time,
         trigger_t* trigger,
-        interval_t extra_delay
+        interval_t extra_delay,
+        trigger_t* triggered_by[TRACE_TRIGGER_LISTS_SIZE],
+        trigger_t* effects[TRACE_TRIGGER_LISTS_SIZE]
 );
 
 /**
@@ -176,21 +183,21 @@ void tracepoint(
  * @param reaction Pointer to the reaction_t struct for the reaction.
  * @param worker The thread number of the worker thread or 0 for unthreaded execution.
  */
-void tracepoint_reaction_starts(reaction_t* reaction, int worker);
+void tracepoint_reaction_starts(reaction_t* reaction, int worker, trigger_t* triggered_by[TRACE_TRIGGER_LISTS_SIZE]);
 
 /**
  * Trace the end of a reaction execution.
  * @param reaction Pointer to the reaction_t struct for the reaction.
  * @param worker The thread number of the worker thread or 0 for unthreaded execution.
  */
-void tracepoint_reaction_ends(reaction_t* reaction, int worker);
+void tracepoint_reaction_ends(reaction_t* reaction, int worker, trigger_t* effects[TRACE_TRIGGER_LISTS_SIZE]);
 
 /**
  * Trace a call to schedule.
  * @param trigger Pointer to the trigger_t struct for the trigger.
  * @param extra_delay The extra delay passed to schedule().
  */
-void tracepoint_schedule(trigger_t* trigger, interval_t extra_delay);
+void tracepoint_schedule(trigger_t* trigger, interval_t extra_delay, reaction_t* reaction);
 
 /**
  * Trace a user-defined event. Before calling this, you must call
@@ -240,6 +247,11 @@ void tracepoint_worker_advancing_time_ends(int worker);
 
 void stop_trace();
 
+
+trigger_t** get_triggered_effects_list(reaction_t* reaction);
+
+trigger_t** get_present_triggers_list(reaction_t* reaction);
+
 #else
 
 // empty definition in case we compile without tracing
@@ -254,6 +266,8 @@ void stop_trace();
 #define tracepoint_worker_wait_ends(...)
 #define tracepoint_worker_advancing_time_starts(...);
 #define tracepoint_worker_advancing_time_ends(...);
+#define get_triggered_effects_list(...);
+#define get_present_triggers_list(...);
 
 #define start_trace(...)
 #define stop_trace(...)

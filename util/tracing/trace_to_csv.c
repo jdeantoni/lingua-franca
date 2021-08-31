@@ -110,7 +110,15 @@ size_t read_and_write_trace() {
         if (trigger_name == NULL) {
             trigger_name = "NO TRIGGER";
         }
-        fprintf(output_file, "%s, %s, %s, %d, %lld, %d, %lld, %s, %lld\n",
+        char* triggered_by_list = get_triggers_name_list(trace[i].triggered_by);
+        if (triggered_by_list == NULL) {
+            triggered_by_list = "N/A";
+        }
+        char* effects_list = get_triggers_name_list(trace[i].effects);
+        if (effects_list == NULL) {
+            effects_list = "N/A";
+        }
+        fprintf(output_file, "%s, %s, %s, %d, %lld, %d, %lld, %s, %lld, <%s>, <%s>\n",
                 trace_event_names[trace[i].event_type],
                 reactor_name,
                 reaction_name,
@@ -119,7 +127,9 @@ size_t read_and_write_trace() {
                 trace[i].microstep,
                 trace[i].physical_time - start_time,
                 trigger_name,
-                trace[i].extra_delay
+                trace[i].extra_delay,
+                triggered_by_list,
+                effects_list
         );
         // Update summary statistics.
         if (trace[i].physical_time > latest_time) {
@@ -377,7 +387,7 @@ int main(int argc, char* argv[]) {
         summary_stats = (summary_stats_t**)calloc(table_size, sizeof(summary_stats_t*));
 
         // Write a header line into the CSV file.
-        fprintf(output_file, "Event, Reactor, Reaction, Worker, Elapsed Logical Time, Microstep, Elapsed Physical Time, Trigger, Extra Delay\n");
+        fprintf(output_file, "Event, Reactor, Reaction, Worker, Elapsed Logical Time, Microstep, Elapsed Physical Time, Trigger, Extra Delay, Triggered By, Effects\n");
         while (read_and_write_trace() != 0) {};
 
         write_summary_file();
